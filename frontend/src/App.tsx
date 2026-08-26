@@ -134,9 +134,9 @@ function App() {
     try {
       let stream: MediaStream;
       try {
-        // Try rear camera first
+        // Try front camera first
         stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { facingMode: { ideal: "environment" } }, 
+          video: { facingMode: { ideal: "user" } }, 
           audio: false 
         });
       } catch (e) {
