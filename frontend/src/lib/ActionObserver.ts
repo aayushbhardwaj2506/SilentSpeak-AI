@@ -158,7 +158,7 @@ export class ActionObserver {
     
     const def = GESTURE_VOCABULARY[token];
     if (def) {
-      const sentence = `user signed/gestured: ${def.possibleMeanings.join(" or ")}`;
+      const sentence = `[GESTURE: ${def.displayName}] Potential meanings: ${def.possibleMeanings.join(", ")}`;
       this.addObservationSafe(sentence);
       this.lastMovementTime = timestampMs;
     }

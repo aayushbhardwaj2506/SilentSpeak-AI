@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { GESTURE_VOCABULARY } from './lib/GestureVocabulary'
 import { HandLandmarker, FaceLandmarker, PoseLandmarker, FilesetResolver, DrawingUtils } from '@mediapipe/tasks-vision'
 import { GestureRecognizer } from './lib/GestureRecognizer'
 import { ActionObserver } from './lib/ActionObserver'
@@ -59,7 +60,7 @@ function App() {
     pose: { landmarks: [] }
   });
   // State just for the dev UI (updated periodically or on demand)
-  const [uiPerceptionState, setUiPerceptionState] = useState<PerceptionData>(perceptionDataRef.current);
+  // const [uiPerceptionState, setUiPerceptionState] = useState<PerceptionData>(perceptionDataRef.current);
   
   const [isProcessing, setIsProcessing] = useState(false);
   const isProcessingRef = useRef<boolean>(false);
@@ -132,14 +133,7 @@ function App() {
           cameraActiveRef.current = true;
           setError(null);
           
-          // Setup UI updater for Dev Panel (runs 2 times a second to save React renders)
-          const uiInterval = setInterval(() => {
-            if (cameraActiveRef.current) {
-               setUiPerceptionState(perceptionDataRef.current);
-            } else {
-               clearInterval(uiInterval);
-            }
-          }, 500);
+          // UI updater for Dev Panel was removed
 
           // Start detection loop once video is loaded
           predictWebcam();
@@ -295,7 +289,12 @@ function App() {
         if (lastInterpretedGestureRef.current !== result.gesture && !isProcessingRef.current) {
           lastInterpretedGestureRef.current = result.gesture;
           actionObserverRef.current.addSemanticObservation(result.gesture, startTimeMs);
-          interpretGesture(result);
+          
+          const def = GESTURE_VOCABULARY[result.gesture];
+          if (def && def.directSpeech) {
+            // Fast-lane for deterministic actions (e.g. HELP, numbers)
+            interpretGesture(result);
+          }
         }
       } else if (!result.stable || result.gesture === 'NO_HAND') {
         // Reset so same gesture can be interpreted again if hand is removed and brought back
@@ -466,23 +465,52 @@ function App() {
 
   return (
     <div className="app-container">
-      <header className="header">
-        <div className="logo">
-          <span className="logo-icon">👁️</span>
-          <h1>SilentSpeak AI</h1>
-        </div>
-        <p className="subtitle">Real-time local translation & interaction</p>
-      </header>
+      <img src="/robot-mascot.jpg" alt="Futuristic Robot Mascot" className="robot-mascot" />
 
+      {/* Left Sidebar */}
+      <aside className="sidebar-left">
+        <div className="logo">
+          <span className="logo-icon">|||</span>
+          <div className="logo-text">
+            <h1>SilentSpeak</h1>
+            <p className="subtitle">Speak Through Silence</p>
+          </div>
+        </div>
+
+        <nav className="nav-menu">
+          <div className="nav-item active"><span className="icon">🏠</span> Home</div>
+          <div className="nav-item"><span className="icon">✌️</span> Gestures</div>
+          <div className="nav-item"><span className="icon">💬</span> Chat</div>
+          <div className="nav-item"><span className="icon">🕒</span> History</div>
+          <div className="nav-item"><span className="icon">⚙️</span> Settings</div>
+          <div className="nav-item"><span className="icon">❓</span> Help</div>
+        </nav>
+
+        <div className="tip-panel">
+          <div className="tip-header"><span className="icon">💡</span> Tip</div>
+          <p>Show clear hand gestures in good lighting for best results.</p>
+        </div>
+      </aside>
+
+      {/* Main Center Content */}
       <main className="main-content">
         <div className="glass-panel video-container">
+          <div className="video-header">
+            <div className="video-title">
+              <h2>Live Camera</h2>
+              <span className="live-dot"></span>
+            </div>
+            <div className="camera-selector">Camera: Integrated Webcam <span>▼</span></div>
+          </div>
+          
           {error && <div className="error-message">{error}</div>}
           
           <div className={`video-wrapper ${cameraActive ? 'active' : ''}`}>
             {!cameraActive && (
               <div className="placeholder-content">
-                <div className="pulse-circle"></div>
-                <p>Camera inactive</p>
+                <span className="camera-icon">📷</span>
+                <p className="camera-status-text">Camera is inactive</p>
+                <p className="camera-sub-text">Show your gesture...</p>
               </div>
             )}
             <video 
@@ -519,104 +547,53 @@ function App() {
           </div>
         </div>
 
-        <div className="side-panels">
-          <div className="glass-panel recognition-panel">
-            <h2>Recognition</h2>
-            <div className="gesture-display">
-              <span className="gesture-label">CURRENT GESTURE</span>
-              <div className="gesture-value">
-                {gestureResult?.gesture === 'NO_HAND' ? 'NO HAND DETECTED' : 
-                 gestureResult?.gesture === 'UNKNOWN' ? 'UNKNOWN GESTURE' : 
-                 gestureResult?.gesture || 'WAITING...'}
-              </div>
-            </div>
-            
-            <div className="confidence-display">
-              <span className="gesture-label">CONFIDENCE</span>
-              <div className="confidence-value">
-                {gestureResult?.gesture === 'NO_HAND' ? '-' : 
-                 `${Math.round((gestureResult?.confidence || 0) * 100)}%`}
-              </div>
-            </div>
-            
-            <div className="status-display">
-              <span className="gesture-label">STATUS</span>
-              <div className={`status-value ${gestureResult?.stable ? 'stable' : 'unstable'}`}>
-                {gestureResult?.stable ? 'STABLE' : 'UNSTABLE'}
-              </div>
+        <div className="glass-panel recognition-panel horizontal">
+          <div className="recognition-info">
+            <span className="gesture-label">Recognized Gesture</span>
+            <div className="gesture-value">
+              {gestureResult?.gesture === 'NO_HAND' ? 'NO HAND DETECTED' : 
+               gestureResult?.gesture === 'UNKNOWN' ? 'UNKNOWN GESTURE' : 
+               gestureResult?.gesture || 'WAITING...'}
             </div>
           </div>
+          <div className={`status-badge ${gestureResult?.stable ? 'detected' : 'pending'}`}>
+            {gestureResult?.stable ? '✓ Detected' : '...'}
+          </div>
+        </div>
 
-          <div className="glass-panel info-panel">
-            <h2>System Status</h2>
-            <div className="status-item">
-              <span className="status-label">Camera</span>
-              <span className={`status-indicator ${cameraActive ? 'active' : 'inactive'}`}>
-                {cameraActive ? 'Active' : 'Inactive'}
-              </span>
-            </div>
-            <div className="status-item">
-              <span className="status-label">MediaPipe Model</span>
-              <span className={`status-indicator ${handLandmarker ? 'active' : 'pending'}`}>
-                {handLandmarker ? 'Loaded' : 'Loading...'}
-              </span>
-            </div>
-            <div className="status-item">
-              <span className="status-label">Hand Tracking</span>
-              <span className={`status-indicator ${gestureResult?.gesture !== 'NO_HAND' && gestureResult ? 'active' : 'inactive'}`}>
-                {gestureResult?.gesture !== 'NO_HAND' && gestureResult ? 'Detecting' : 'No Hands'}
-              </span>
+        <div className="glass-panel speech-panel horizontal">
+          <div className="speech-info">
+            <span className="gesture-label">Speech Output</span>
+            <div className="speech-text">
+               <span className="speaker-icon">🔊</span>
+               <span>{agentDecision ? agentDecision.response_text : "Waiting for stable gesture..."}</span>
             </div>
           </div>
-          
-          <div className="glass-panel dev-panel">
-            <h2>Dual-Hand Control (Dev)</h2>
-            <div className="status-item">
-              <span className="status-label">Hands Detected</span>
-              <span className="status-value">{handTrackingData.numHands} ({handTrackingData.handednesses.join(', ') || 'None'})</span>
-            </div>
-            <div className="status-item">
-              <span className="status-label">Two-Hand Status</span>
-              <span className={`status-indicator ${handTrackingData.numHands === 2 ? 'active' : 'inactive'}`}>
-                {handTrackingData.numHands === 2 ? 'ACTIVE' : 'INACTIVE'}
-              </span>
-            </div>
-            <div className="status-item">
-              <span className="status-label">Wrist Distance</span>
-              <span className="status-value">
-                {handTrackingData.distanceNormalized !== null 
-                  ? handTrackingData.distanceNormalized.toFixed(4) 
-                  : '-'}
-              </span>
-            </div>
+          <div className="speech-actions">
+            <button className="icon-btn" title="Copy Text">📋</button>
+            <button className="btn btn-primary" onClick={() => {if(agentDecision?.response_text) playTTS(agentDecision.response_text)}}>
+              <span className="speaker-icon">🔊</span> Speak
+            </button>
           </div>
-          
-          <div className="glass-panel dev-panel">
-            <h2>Perception Engine (Dev)</h2>
-            <div className="status-item">
-              <span className="status-label">Hands</span>
-              <span className={`status-indicator ${uiPerceptionState.hands.landmarks.length > 0 ? 'active' : 'inactive'}`}>
-                {uiPerceptionState.hands.landmarks.length > 0 ? 'DETECTED' : 'NONE'}
-              </span>
-            </div>
-            <div className="status-item">
-              <span className="status-label">Face</span>
-              <span className={`status-indicator ${uiPerceptionState.face.landmarks.length > 0 ? 'active' : 'inactive'}`}>
-                {uiPerceptionState.face.landmarks.length > 0 ? 'DETECTED' : 'NONE'}
-              </span>
-            </div>
-            <div className="status-item">
-              <span className="status-label">Pose</span>
-              <span className={`status-indicator ${uiPerceptionState.pose.landmarks.length > 0 ? 'active' : 'inactive'}`}>
-                {uiPerceptionState.pose.landmarks.length > 0 ? 'DETECTED' : 'NONE'}
-              </span>
-            </div>
-          </div>
-          
-          <div className="glass-panel agent-panel">
-            <h2>Agent Panel</h2>
-            <div className="agent-status">
-              <span className="status-label">Status:</span>
+        </div>
+      </main>
+
+      {/* Right Sidebar */}
+      <aside className="sidebar-right">
+        <div className="top-status">
+          <div className="status-badge online"><span className="dot"></span> Online</div>
+        </div>
+        
+        <div className="glass-panel action-menu">
+           <h2>Quick Actions</h2>
+           <div className="action-item"><span className="icon">🗑️</span> Clear Text</div>
+           <div className="action-item"><span className="icon">📋</span> Copy Text</div>
+           <div className="action-item"><span className="icon">📥</span> Download</div>
+        </div>
+        
+        <div className="glass-panel recent-gestures">
+           <h2>Agent Status & Context</h2>
+           <div className="agent-status">
               {isProcessing ? (
                 <span className="agent-badge processing">Thinking...</span>
               ) : isSpeaking ? (
@@ -624,44 +601,31 @@ function App() {
               ) : (
                 <span className="agent-badge idle">Idle</span>
               )}
-            </div>
-            
-            {actionPayload && actionPayload.observations.length > 0 && (
-               <div className="observation-box" style={{ marginTop: '1rem', padding: '0.5rem', background: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}>
-                 <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem', color: '#a78bfa' }}>Recent Observations:</h4>
-                 <ul style={{ fontSize: '0.85rem', color: '#ccc', paddingLeft: '1rem', margin: 0 }}>
+           </div>
+
+           {actionPayload && actionPayload.observations.length > 0 && (
+               <div className="observation-box">
+                 <h4>Recent Observations</h4>
+                 <ul>
                     {actionPayload.observations.map((obs, idx) => (
                        <li key={idx}>{obs}</li>
                     ))}
                  </ul>
                </div>
             )}
-            
-            <div className="agent-decision-box" style={{ marginTop: '1rem' }}>
-              {agentDecision ? (
-                <>
-                  <div className="decision-row">
-                    <span className="label">Intent:</span>
-                    <span className="value intent">{agentDecision.intent}</span>
-                  </div>
-                  <div className="decision-row">
-                    <span className="label">Decision:</span>
-                    <span className={`value decision ${agentDecision.decision.toLowerCase()}`}>
-                      {agentDecision.decision}
-                    </span>
-                  </div>
-                  <div className="decision-row">
-                    <span className="label">Response:</span>
-                    <span className="value response-text">"{agentDecision.response_text}"</span>
-                  </div>
-                </>
-              ) : (
-                <div className="waiting-text">Waiting for stable gesture...</div>
-              )}
-            </div>
-          </div>
+           
+           <button className="view-history-btn">View all history →</button>
         </div>
-      </main>
+
+        <div className="glass-panel dev-panel" style={{display: 'none'}}>
+           {/* Keeping Dev info hidden but preserved for functionality */}
+           <h2>System Dev Status</h2>
+           <div className="status-item">
+             <span>Camera: {cameraActive ? 'Active' : 'Inactive'}</span>
+             <span>Hands: {handTrackingData.numHands}</span>
+           </div>
+        </div>
+      </aside>
     </div>
   )
 }

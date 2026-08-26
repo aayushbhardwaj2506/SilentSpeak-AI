@@ -24,6 +24,11 @@ class AgentDecision(BaseModel):
 
 class SilentSpeakAgent:
     def __init__(self):
+        # Tracking last spoken text to prevent duplicate spam
+        self.last_spoken_text = ""
+        import time
+        self.last_spoken_time = time.time()
+        
         # We fetch the model from env, default to gemini-3.6-flash
         model_name = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
         
@@ -145,10 +150,6 @@ class SilentSpeakAgent:
             
         # Direct Speech Bypass (Phase 4)
         DIRECT_SPEECH_MAP = {
-            "YES": ("AFFIRMATION", "Yes."),
-            "NO": ("NEGATION", "No."),
-            "THUMBS_UP": ("AFFIRMATION", "Yes, okay."),
-            "THUMBS_DOWN": ("NEGATION", "No, I disagree."),
             "NUMBER_0": ("NUMBER", "Zero."),
             "NUMBER_1": ("NUMBER", "One."),
             "NUMBER_2": ("NUMBER", "Two."),
@@ -160,12 +161,8 @@ class SilentSpeakAgent:
             "NUMBER_8": ("NUMBER", "Eight."),
             "NUMBER_9": ("NUMBER", "Nine."),
             "NUMBER_10": ("NUMBER", "Ten."),
-            "HELLO": ("GREETING", "Hello there!"),
-            "THANK_YOU": ("GRATITUDE", "Thank you."),
             "STOP": ("STOP_ACTION", "Stop."),
-            "OPEN_PALM": ("STOP_ACTION", "Stop."),
-            "HELP": ("EMERGENCY", "I need help."),
-            "WATER": ("NEED", "Water.")
+            "HELP": ("EMERGENCY", "I need help.")
         }
         
         if event.gesture in DIRECT_SPEECH_MAP and event.confidence > 0.8:
@@ -240,11 +237,13 @@ class SilentSpeakAgent:
         Your goal is to synthesize these fragments into the single most likely natural-language sentence the user intends to communicate.
         
         Rules:
-        1. Treat observations holistically. If you see "user pointed left" then "user signed: water or drink", synthesize to "I want to drink that water over there."
-        2. Resolve ambiguous 'or' clauses by using spatial context and sequences. "user signed: me or I" + "user signed: drink or water" = "I want water."
+        1. Treat observations holistically based on semantic overlap and spatial reasoning.
+           - Example: "[GESTURE: Point Right] Potential meanings: right, there, that" + "[GESTURE: Open Palm] Potential meanings: stop, wait, hello, show me, attention" -> "Wait there." or "Stop right there."
+           - Example: "[GESTURE: Hand on Chest] Potential meanings: me, I, my" + "[GESTURE: Cupped Hand] Potential meanings: drink, water" -> "I want something to drink."
+        2. Resolve ambiguous meanings by using spatial context and sequences. Do not just list possibilities. Pick the most coherent combination.
         3. Use broader intents such as: GREETING, ATTENTION, REQUEST, QUESTION, DIRECTION, FOOD_REQUEST, DRINK_REQUEST, AGREEMENT, DISAGREEMENT, EMOTION, INFORMATION, UNKNOWN.
         4. If the sequence is highly ambiguous and cannot form a coherent thought, return an UNKNOWN intent. Do not hallucinate meaning.
-        5. Do not produce generic meta-commentary like "The user is pointing." Speak AS the user.
+        5. Speak AS the user. Do not produce generic meta-commentary like "The user is pointing."
         6. Set 'decision' to "SPEAK" if you confidently infer an intent, otherwise "IGNORE" or "CONFIRM".
         7. Your 'response_text' MUST be a natural spoken sentence representing the user's voice (e.g., "Please come over here.", "I would like some water.").
         8. Return your output EXACTLY matching the JSON schema containing: intent, decision, response_text, and confidence.
@@ -276,11 +275,27 @@ class SilentSpeakAgent:
             content = resp.json()["choices"][0]["message"]["content"]
             data = json.loads(content)
             
+            intent = data.get("intent", "UNKNOWN")
+            decision = data.get("decision", "IGNORE")
+            response_text = data.get("response_text", "I did not understand.")
+            confidence = float(data.get("confidence", 0.9))
+            
+            # Duplicate Suppression Logic
+            import time
+            current_time = time.time()
+            if decision == "SPEAK" and response_text == self.last_spoken_text and (current_time - self.last_spoken_time < 5.0):
+                # Suppress exact duplicates within 5 seconds
+                decision = "IGNORE"
+                
+            if decision == "SPEAK":
+                self.last_spoken_text = response_text
+                self.last_spoken_time = current_time
+            
             return AgentDecision(
-                intent=data.get("intent", "UNKNOWN"),
-                decision=data.get("decision", "IGNORE"),
-                response_text=data.get("response_text", "I did not understand."),
-                confidence=float(data.get("confidence", 0.9))
+                intent=intent,
+                decision=decision,
+                response_text=response_text,
+                confidence=confidence
             )
         except Exception as e:
             print("Groq Observation Error:", str(e))
