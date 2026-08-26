@@ -41,17 +41,17 @@ function App() {
   const smoothedPosXRef = useRef<number>(50);
   const smoothedPosYRef = useRef<number>(50);
   const [cameraActive, setCameraActive] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [_, setError] = useState<string | null>(null);
   const [handLandmarker, setHandLandmarker] = useState<HandLandmarker | null>(null);
   const [faceLandmarker, setFaceLandmarker] = useState<FaceLandmarker | null>(null);
   const [poseLandmarker, setPoseLandmarker] = useState<PoseLandmarker | null>(null);
   
   const [gestureResult, setGestureResult] = useState<GestureResult | null>(null);
   const [agentDecision, setAgentDecision] = useState<AgentDecision | null>(null);
-  const [handTrackingData, setHandTrackingData] = useState<HandTrackingData>({ numHands: 0, handednesses: [], distanceNormalized: null });
+  const [__, setHandTrackingData] = useState<HandTrackingData>({ numHands: 0, handednesses: [], distanceNormalized: null });
   
   const actionObserverRef = useRef(new ActionObserver());
-  const [actionPayload, setActionPayload] = useState<ActionObservationPayload | null>(null);
+  const [___, setActionPayload] = useState<ActionObservationPayload | null>(null);
 
   // Use a ref for real-time perception data to avoid 60fps re-renders
   const perceptionDataRef = useRef<PerceptionData>({
@@ -465,52 +465,26 @@ function App() {
 
   return (
     <div className="app-container">
-      <img src="/robot-mascot.jpg" alt="Futuristic Robot Mascot" className="robot-mascot" />
-
-      {/* Left Sidebar */}
-      <aside className="sidebar-left">
-        <div className="logo">
-          <span className="logo-icon">|||</span>
-          <div className="logo-text">
-            <h1>SilentSpeak</h1>
-            <p className="subtitle">Speak Through Silence</p>
-          </div>
+      {/* Header */}
+      <header className="header">
+        <div className="logo-section">
+          <h1>SilentSpeak</h1>
+          <p>AI Gesture → Speech Communication</p>
         </div>
-
-        <nav className="nav-menu">
-          <div className="nav-item active"><span className="icon">🏠</span> Home</div>
-          <div className="nav-item"><span className="icon">✌️</span> Gestures</div>
-          <div className="nav-item"><span className="icon">💬</span> Chat</div>
-          <div className="nav-item"><span className="icon">🕒</span> History</div>
-          <div className="nav-item"><span className="icon">⚙️</span> Settings</div>
-          <div className="nav-item"><span className="icon">❓</span> Help</div>
-        </nav>
-
-        <div className="tip-panel">
-          <div className="tip-header"><span className="icon">💡</span> Tip</div>
-          <p>Show clear hand gestures in good lighting for best results.</p>
+        <div className="status-badge online">
+          <span className="dot"></span> Online
         </div>
-      </aside>
+      </header>
 
-      {/* Main Center Content */}
-      <main className="main-content">
-        <div className="glass-panel video-container">
-          <div className="video-header">
-            <div className="video-title">
-              <h2>Live Camera</h2>
-              <span className="live-dot"></span>
-            </div>
-            <div className="camera-selector">Camera: Integrated Webcam <span>▼</span></div>
-          </div>
-          
-          {error && <div className="error-message">{error}</div>}
-          
-          <div className={`video-wrapper ${cameraActive ? 'active' : ''}`}>
+      {/* Main Layout */}
+      <main className="main-layout">
+        {/* Video Section */}
+        <section className="video-section">
+          <div className="video-wrapper">
             {!cameraActive && (
               <div className="placeholder-content">
                 <span className="camera-icon">📷</span>
-                <p className="camera-status-text">Camera is inactive</p>
-                <p className="camera-sub-text">Show your gesture...</p>
+                <p>Camera is inactive</p>
               </div>
             )}
             <video 
@@ -524,108 +498,48 @@ function App() {
               ref={canvasRef}
               className={`output-canvas ${cameraActive ? 'visible' : 'hidden'}`}
             />
-          </div>
-
-          <div className="controls">
-            {!cameraActive ? (
-              <button className="btn btn-primary" onClick={startCamera} disabled={!handLandmarker}>
-                <span className="btn-icon">▶</span> {handLandmarker ? 'Start Camera' : 'Loading ML Model...'}
-              </button>
-            ) : (
-              <button className="btn btn-danger" onClick={stopCamera}>
-                <span className="btn-icon">⏹</span> Stop Camera
-              </button>
-            )}
             
-            {/* The Futuristic Energy Orb */}
             <div ref={orbRef} className="energy-orb">
               <div className="orb-core"></div>
-              <div className="orb-ring ring-1"></div>
-              <div className="orb-ring ring-2"></div>
-              <div className="orb-particles"></div>
             </div>
           </div>
-        </div>
+        </section>
 
-        <div className="glass-panel recognition-panel horizontal">
-          <div className="recognition-info">
-            <span className="gesture-label">Recognized Gesture</span>
-            <div className="gesture-value">
-              {gestureResult?.gesture === 'NO_HAND' ? 'NO HAND DETECTED' : 
-               gestureResult?.gesture === 'UNKNOWN' ? 'UNKNOWN GESTURE' : 
+        {/* Communication Panel */}
+        <section className="communication-panel">
+          <div className="panel-block">
+            <span className="label">Detected Gesture</span>
+            <div className="gesture-result">
+              {gestureResult?.gesture === 'NO_HAND' ? 'WAITING...' : 
+               gestureResult?.gesture === 'UNKNOWN' ? 'UNKNOWN' : 
                gestureResult?.gesture || 'WAITING...'}
             </div>
           </div>
-          <div className={`status-badge ${gestureResult?.stable ? 'detected' : 'pending'}`}>
-            {gestureResult?.stable ? '✓ Detected' : '...'}
-          </div>
-        </div>
 
-        <div className="glass-panel speech-panel horizontal">
-          <div className="speech-info">
-            <span className="gesture-label">Speech Output</span>
-            <div className="speech-text">
-               <span className="speaker-icon">🔊</span>
-               <span>{agentDecision ? agentDecision.response_text : "Waiting for stable gesture..."}</span>
+          <div className="panel-block">
+            <span className="label">Speaking</span>
+            <div className="speech-result">
+              {agentDecision ? agentDecision.response_text : "..."}
             </div>
           </div>
-          <div className="speech-actions">
-            <button className="icon-btn" title="Copy Text">📋</button>
-            <button className="btn btn-primary" onClick={() => {if(agentDecision?.response_text) playTTS(agentDecision.response_text)}}>
-              <span className="speaker-icon">🔊</span> Speak
-            </button>
-          </div>
-        </div>
-      </main>
 
-      {/* Right Sidebar */}
-      <aside className="sidebar-right">
-        <div className="top-status">
-          <div className="status-badge online"><span className="dot"></span> Online</div>
-        </div>
-        
-        <div className="glass-panel action-menu">
-           <h2>Quick Actions</h2>
-           <div className="action-item"><span className="icon">🗑️</span> Clear Text</div>
-           <div className="action-item"><span className="icon">📋</span> Copy Text</div>
-           <div className="action-item"><span className="icon">📥</span> Download</div>
-        </div>
-        
-        <div className="glass-panel recent-gestures">
-           <h2>Agent Status & Context</h2>
-           <div className="agent-status">
-              {isProcessing ? (
-                <span className="agent-badge processing">Thinking...</span>
-              ) : isSpeaking ? (
-                <span className="agent-badge speaking">🔊 Speaking...</span>
-              ) : (
-                <span className="agent-badge idle">Idle</span>
-              )}
-           </div>
-
-           {actionPayload && actionPayload.observations.length > 0 && (
-               <div className="observation-box">
-                 <h4>Recent Observations</h4>
-                 <ul>
-                    {actionPayload.observations.map((obs, idx) => (
-                       <li key={idx}>{obs}</li>
-                    ))}
-                 </ul>
-               </div>
+          <div className="controls-section">
+            {!cameraActive ? (
+              <button className="btn btn-primary" onClick={startCamera} disabled={!handLandmarker}>
+                ▶ {handLandmarker ? 'Start' : 'Loading Model...'}
+              </button>
+            ) : (
+              <button className="btn btn-danger" onClick={stopCamera}>
+                ⏹ Stop
+              </button>
             )}
-           
-           <button className="view-history-btn">View all history →</button>
-        </div>
-
-        <div className="glass-panel dev-panel" style={{display: 'none'}}>
-           {/* Keeping Dev info hidden but preserved for functionality */}
-           <h2>System Dev Status</h2>
-           <div className="status-item">
-             <span>Camera: {cameraActive ? 'Active' : 'Inactive'}</span>
-             <span>Hands: {handTrackingData.numHands}</span>
-           </div>
-        </div>
-      </aside>
+            
+            <div style={{textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-muted)'}}>
+              {isProcessing ? "Thinking..." : isSpeaking ? "🔊 Speaking..." : "Idle"}
+            </div>
+          </div>
+        </section>
+      </main>
     </div>
   )
 }
