@@ -362,7 +362,7 @@ function App() {
         
         const reqTime = Date.now();
         
-        const response = await fetch("http://127.0.0.1:8001/api/agent/observe", {
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8001'}/api/agent/observe`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json"
@@ -387,11 +387,8 @@ function App() {
         setActionPayload(payload);
         setAgentDecision(data);
         
-        if (data.decision === "SPEAK" && data.response_text) {
-          setIsSpeaking(true);
-          const utterance = new SpeechSynthesisUtterance(data.response_text);
-          utterance.onend = () => setIsSpeaking(false);
-          window.speechSynthesis.speak(utterance);
+        if ((data.decision === "SPEAK" || data.decision === "CONFIRM") && data.response_text) {
+          playTTS(data.response_text);
         }
       } catch (err) {
         console.error(err);
@@ -433,8 +430,7 @@ function App() {
     isProcessingRef.current = true;
     setIsProcessing(true);
     try {
-      // Try 8000 first, fallback to 8001 if needed (since port was an issue previously)
-      const apiUrl = 'http://127.0.0.1:8001/api/agent/interpret';
+      const apiUrl = `${import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8001'}/api/agent/interpret`;
       
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -452,31 +448,11 @@ function App() {
       const data: AgentDecision = await response.json();
       setAgentDecision(data);
       
-      if (data.decision === 'SPEAK' && data.response_text) {
+      if ((data.decision === 'SPEAK' || data.decision === 'CONFIRM') && data.response_text) {
         playTTS(data.response_text);
       }
     } catch (err) {
       console.error("Agent interpretation failed:", err);
-      // Try alternative port if 8001 fails (just in case)
-      try {
-        const response = await fetch('http://127.0.0.1:8000/api/agent/interpret', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            gesture: result.gesture,
-            confidence: result.confidence,
-            stable: result.stable,
-            timestamp: Date.now()
-          })
-        });
-        if (response.ok) {
-           const data: AgentDecision = await response.json();
-           setAgentDecision(data);
-           if (data.decision === 'SPEAK' && data.response_text) playTTS(data.response_text);
-        }
-      } catch (e) {
-         console.error("Agent interpretation failed on fallback port too.");
-      }
     } finally {
       isProcessingRef.current = false;
       setIsProcessing(false);
