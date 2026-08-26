@@ -1,3 +1,5 @@
+import { GESTURE_VOCABULARY } from './GestureVocabulary';
+
 export interface ActionObservationPayload {
   observationId: string;
   duration: number;
@@ -22,17 +24,23 @@ export class ActionObserver {
   private observationStartTime: number = 0;
   private lastMovementTime: number = 0;
   
-  private observations: Set<string> = new Set();
+  private observations: string[] = []; // Changed to array for sequence order
   
   // To track movement speed/distance
   private lastHandPosition: { x: number, y: number, z: number } | null = null;
   private accumulatedMovement: number = 0;
 
   // Thresholds
-  private readonly MOVEMENT_THRESHOLD = 0.05; // To start observation
-  private readonly PAUSE_THRESHOLD_MS = 1000; // 1 second of stillness to flush
-  private readonly MAX_OBSERVATION_TIME_MS = 8000; // Max 8 seconds window
+  private readonly MOVEMENT_THRESHOLD = 0.05;
+  private readonly PAUSE_THRESHOLD_MS = 1000;
+  private readonly MAX_OBSERVATION_TIME_MS = 8000;
   
+  private addObservationSafe(obs: string) {
+    if (this.observations.length === 0 || this.observations[this.observations.length - 1] !== obs) {
+      this.observations.push(obs);
+    }
+  }
+
   public processFrames(perceptionData: PerceptionData, timestampMs: number): ActionObservationPayload | null {
     const hasHands = perceptionData.hands.landmarks.length > 0;
     
@@ -59,47 +67,45 @@ export class ActionObserver {
         if (!this.isObserving && this.accumulatedMovement > this.MOVEMENT_THRESHOLD) {
           this.isObserving = true;
           this.observationStartTime = timestampMs;
-          this.observations.clear();
+          this.observations = [];
         }
       }
       this.lastHandPosition = { x: wrist.x, y: wrist.y, z: wrist.z };
       
       // Extract Semantics if observing
       if (this.isObserving) {
-        // Feature 1: Pointing
+        // Feature 1: Pointing (Fallbacks)
         const indexExtendedDist = Math.sqrt(
            (indexTip.x - wrist.x)**2 + (indexTip.y - wrist.y)**2
         );
         const thumbDist = Math.sqrt(
            (thumbTip.x - wrist.x)**2 + (thumbTip.y - wrist.y)**2
         );
-        // Basic heuristic: index finger extended, thumb closed
+        
         if (indexExtendedDist > 0.25 && thumbDist < 0.2) {
-           // Determine direction (remember video is mirrored so x is inverted physically, but for now we just label it)
-           if (indexTip.x < wrist.x - 0.1) this.observations.add("user pointed to the right");
-           else if (indexTip.x > wrist.x + 0.1) this.observations.add("user pointed to the left");
-           else if (indexTip.y < wrist.y - 0.1) this.observations.add("user pointed upward");
-           else if (indexTip.y > wrist.y + 0.1) this.observations.add("user pointed downward");
-           else this.observations.add("user pointed forward");
+           if (indexTip.x < wrist.x - 0.1) this.addObservationSafe("user pointed to the right");
+           else if (indexTip.x > wrist.x + 0.1) this.addObservationSafe("user pointed to the left");
+           else if (indexTip.y < wrist.y - 0.1) this.addObservationSafe("user pointed upward");
+           else if (indexTip.y > wrist.y + 0.1) this.addObservationSafe("user pointed downward");
+           else this.addObservationSafe("user pointed forward");
         }
         
         // Feature 2: Hand to Mouth
         if (perceptionData.face.landmarks && perceptionData.face.landmarks.length > 0) {
-           const mouthTop = perceptionData.face.landmarks[0][13]; // Upper lip
-           const mouthBottom = perceptionData.face.landmarks[0][14]; // Lower lip
-           // Estimate mouth center
+           const mouthTop = perceptionData.face.landmarks[0][13];
+           const mouthBottom = perceptionData.face.landmarks[0][14];
            const mouthY = (mouthTop.y + mouthBottom.y) / 2;
            const mouthX = (mouthTop.x + mouthBottom.x) / 2;
            
            const handToMouthDist = Math.sqrt((wrist.x - mouthX)**2 + (wrist.y - mouthY)**2);
-           if (handToMouthDist < 0.25) { // Increased from 0.15
-               this.observations.add("right hand moved toward mouth");
+           if (handToMouthDist < 0.25) { 
+               this.addObservationSafe("right hand moved toward mouth");
            }
         }
         
         // Feature 3: Waving / Significant motion
-        if (this.accumulatedMovement > 1.5) { // Increased from 0.8 so normal reach doesn't trigger it
-           this.observations.add("user made a significant waving motion");
+        if (this.accumulatedMovement > 1.5) { 
+           this.addObservationSafe("user made a significant waving motion");
         }
       }
     }
@@ -124,11 +130,11 @@ export class ActionObserver {
     if (!this.isObserving) return null;
     
     const duration = (timestampMs - this.observationStartTime) / 1000.0;
-    const finalObservations = Array.from(this.observations);
+    const finalObservations = [...this.observations];
     
     // Reset
     this.isObserving = false;
-    this.observations.clear();
+    this.observations = [];
     this.accumulatedMovement = 0;
     
     if (finalObservations.length === 0) return null;
@@ -146,39 +152,14 @@ export class ActionObserver {
     if (!this.isObserving) {
       this.isObserving = true;
       this.observationStartTime = timestampMs;
-      this.observations.clear();
+      this.observations = [];
       this.accumulatedMovement = 0;
     }
     
-    const semanticMap: Record<string, string> = {
-      'HELLO': "user waved hello",
-      'YES': "user signed 'yes'",
-      'NO': "user signed 'no'",
-      'HELP': "user signed 'help'",
-      'WATER': "user signed 'water'",
-      'STOP': "user signed 'stop'",
-      'THANK_YOU': "user signed 'thank you'",
-      'THUMBS_UP': "user gave a thumbs up",
-      'THUMBS_DOWN': "user gave a thumbs down",
-      'PEACE': "user showed a peace sign",
-      'OK_SIGN': "user showed an OK sign",
-      'FIST': "user held up a fist",
-      'OPEN_PALM': "user held up an open palm",
-      'POINT_UP': "user pointed up",
-      'POINT_DOWN': "user pointed down",
-      'POINT_LEFT': "user pointed left",
-      'POINT_RIGHT': "user pointed right",
-      'NUMBER_0': "user showed the number 0",
-      'NUMBER_1': "user showed the number 1",
-      'NUMBER_2': "user showed the number 2",
-      'NUMBER_3': "user showed the number 3",
-      'NUMBER_4': "user showed the number 4",
-      'NUMBER_5': "user showed the number 5"
-    };
-
-    const sentence = semanticMap[token];
-    if (sentence) {
-      this.observations.add(sentence);
+    const def = GESTURE_VOCABULARY[token];
+    if (def) {
+      const sentence = `user signed/gestured: ${def.possibleMeanings.join(" or ")}`;
+      this.addObservationSafe(sentence);
       this.lastMovementTime = timestampMs;
     }
   }

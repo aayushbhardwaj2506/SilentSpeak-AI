@@ -155,9 +155,17 @@ class SilentSpeakAgent:
             "NUMBER_3": ("NUMBER", "Three."),
             "NUMBER_4": ("NUMBER", "Four."),
             "NUMBER_5": ("NUMBER", "Five."),
+            "NUMBER_6": ("NUMBER", "Six."),
+            "NUMBER_7": ("NUMBER", "Seven."),
+            "NUMBER_8": ("NUMBER", "Eight."),
+            "NUMBER_9": ("NUMBER", "Nine."),
+            "NUMBER_10": ("NUMBER", "Ten."),
             "HELLO": ("GREETING", "Hello there!"),
             "THANK_YOU": ("GRATITUDE", "Thank you."),
-            "STOP": ("STOP_ACTION", "Stop.")
+            "STOP": ("STOP_ACTION", "Stop."),
+            "OPEN_PALM": ("STOP_ACTION", "Stop."),
+            "HELP": ("EMERGENCY", "I need help."),
+            "WATER": ("NEED", "Water.")
         }
         
         if event.gesture in DIRECT_SPEECH_MAP and event.confidence > 0.8:
@@ -228,17 +236,17 @@ class SilentSpeakAgent:
             
         system_instruction = """
         You are the Action Observation semantic interpreter for SilentSpeak AI.
-        You receive a list of physical observations that occurred over a short time window.
-        Your goal is to infer the natural-language sentence the user intends to communicate.
+        You receive a sequential list of semantic gesture options and physical movements that occurred over a short time window.
+        Your goal is to synthesize these fragments into the single most likely natural-language sentence the user intends to communicate.
         
         Rules:
-        1. Treat observations as physical/action descriptions, NOT predefined gesture meanings. A "significant waving motion" must NEVER automatically map to NEGATION.
-        2. Infer communicative intent from the complete sequence of observations.
+        1. Treat observations holistically. If you see "user pointed left" then "user signed: water or drink", synthesize to "I want to drink that water over there."
+        2. Resolve ambiguous 'or' clauses by using spatial context and sequences. "user signed: me or I" + "user signed: drink or water" = "I want water."
         3. Use broader intents such as: GREETING, ATTENTION, REQUEST, QUESTION, DIRECTION, FOOD_REQUEST, DRINK_REQUEST, AGREEMENT, DISAGREEMENT, EMOTION, INFORMATION, UNKNOWN.
-        4. Do not force an observation into an unrelated intent. If one physical action is ambiguous, return a sensible UNKNOWN/AMBIGUOUS interpretation rather than hallucinating.
-        5. Do not produce generic responses such as "Understood" unless the user actually communicated acknowledgement.
+        4. If the sequence is highly ambiguous and cannot form a coherent thought, return an UNKNOWN intent. Do not hallucinate meaning.
+        5. Do not produce generic meta-commentary like "The user is pointing." Speak AS the user.
         6. Set 'decision' to "SPEAK" if you confidently infer an intent, otherwise "IGNORE" or "CONFIRM".
-        7. Your 'response_text' MUST be a natural sentence (e.g., "Please come over here.", "I would like some water.").
+        7. Your 'response_text' MUST be a natural spoken sentence representing the user's voice (e.g., "Please come over here.", "I would like some water.").
         8. Return your output EXACTLY matching the JSON schema containing: intent, decision, response_text, and confidence.
         """
         

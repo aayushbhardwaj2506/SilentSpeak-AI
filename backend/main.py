@@ -11,10 +11,13 @@ load_dotenv()
 from agent import silent_speak_agent, GestureEvent, AgentDecision, ActionObservation
 app = FastAPI(title="SilentSpeak AI API")
 
-# Allow CORS for local development
+# Allow CORS for local development and production
+cors_origins = os.getenv("CORS_ORIGINS", "*")
+origins_list = [origin.strip() for origin in cors_origins.split(",")] if cors_origins != "*" else ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
