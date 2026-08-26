@@ -14,6 +14,13 @@ interface AgentDecision {
   confidence: number;
 }
 
+interface HistoryItem {
+  id: string;
+  gesture: string;
+  text: string;
+  timestamp: number;
+}
+
 interface HandTrackingData {
   numHands: number;
   handednesses: string[];
@@ -48,6 +55,7 @@ function App() {
   
   const [gestureResult, setGestureResult] = useState<GestureResult | null>(null);
   const [agentDecision, setAgentDecision] = useState<AgentDecision | null>(null);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
   const [__, setHandTrackingData] = useState<HandTrackingData>({ numHands: 0, handednesses: [], distanceNormalized: null });
   
   const actionObserverRef = useRef(new ActionObserver());
@@ -389,6 +397,12 @@ function App() {
         
         if ((data.decision === "SPEAK" || data.decision === "CONFIRM") && data.response_text) {
           playTTS(data.response_text);
+          setHistory(prev => [{
+            id: Date.now().toString() + Math.random(),
+            gesture: 'SEQUENCE',
+            text: data.response_text,
+            timestamp: Date.now()
+          }, ...prev].slice(0, 5));
         }
       } catch (err) {
         console.error(err);
@@ -450,6 +464,12 @@ function App() {
       
       if ((data.decision === 'SPEAK' || data.decision === 'CONFIRM') && data.response_text) {
         playTTS(data.response_text);
+        setHistory(prev => [{
+          id: Date.now().toString() + Math.random(),
+          gesture: result.gesture,
+          text: data.response_text,
+          timestamp: Date.now()
+        }, ...prev].slice(0, 5));
       }
     } catch (err) {
       console.error("Agent interpretation failed:", err);
@@ -520,6 +540,18 @@ function App() {
             <span className="label">Speaking</span>
             <div className="speech-result">
               {agentDecision ? agentDecision.response_text : "..."}
+            </div>
+          </div>
+
+          <div className="panel-block">
+            <span className="label">Recent History</span>
+            <div className="history-list">
+              {history.length === 0 ? <div className="history-empty">No history yet</div> : history.map(item => (
+                <div key={item.id} className="history-item">
+                  <span className="history-gesture">{item.gesture === 'SEQUENCE' ? '🔗 SEQUENCE' : (GESTURE_VOCABULARY[item.gesture]?.displayName || item.gesture)}</span>
+                  <span className="history-text">{item.text}</span>
+                </div>
+              ))}
             </div>
           </div>
 
