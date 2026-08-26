@@ -143,6 +143,32 @@ class SilentSpeakAgent:
                 intent="NO_INPUT", decision="IGNORE", response_text="", confidence=1.0
             )
             
+        # Direct Speech Bypass (Phase 4)
+        DIRECT_SPEECH_MAP = {
+            "YES": ("AFFIRMATION", "Yes."),
+            "NO": ("NEGATION", "No."),
+            "THUMBS_UP": ("AFFIRMATION", "Yes, okay."),
+            "THUMBS_DOWN": ("NEGATION", "No, I disagree."),
+            "NUMBER_0": ("NUMBER", "Zero."),
+            "NUMBER_1": ("NUMBER", "One."),
+            "NUMBER_2": ("NUMBER", "Two."),
+            "NUMBER_3": ("NUMBER", "Three."),
+            "NUMBER_4": ("NUMBER", "Four."),
+            "NUMBER_5": ("NUMBER", "Five."),
+            "HELLO": ("GREETING", "Hello there!"),
+            "THANK_YOU": ("GRATITUDE", "Thank you."),
+            "STOP": ("STOP_ACTION", "Stop.")
+        }
+        
+        if event.gesture in DIRECT_SPEECH_MAP and event.confidence > 0.8:
+            intent, text = DIRECT_SPEECH_MAP[event.gesture]
+            return AgentDecision(
+                intent=intent,
+                decision="SPEAK",
+                response_text=text,
+                confidence=event.confidence
+            )
+            
         groq_api_key = os.getenv("GROQ_API_KEY")
         if not groq_api_key:
             raise Exception("GROQ_API_KEY is not set in environment.")

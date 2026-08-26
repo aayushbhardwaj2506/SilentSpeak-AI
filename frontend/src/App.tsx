@@ -294,6 +294,7 @@ function App() {
       if (result.stable && result.gesture !== 'NO_HAND' && result.gesture !== 'UNKNOWN') {
         if (lastInterpretedGestureRef.current !== result.gesture && !isProcessingRef.current) {
           lastInterpretedGestureRef.current = result.gesture;
+          actionObserverRef.current.addSemanticObservation(result.gesture, startTimeMs);
           interpretGesture(result);
         }
       } else if (!result.stable || result.gesture === 'NO_HAND') {
