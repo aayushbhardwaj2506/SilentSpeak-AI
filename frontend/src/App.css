@@ -11,8 +11,8 @@
 /* Glass Panels */
 .glass-panel {
   background: var(--bg-panel);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(220, 38, 38, 0.2);
   border-radius: 12px;
   padding: 1.5rem;
@@ -74,7 +74,7 @@
 /* Main Layout: 3 Columns on desktop */
 .main-layout {
   display: grid;
-  grid-template-columns: 250px 1fr 350px;
+  grid-template-columns: 180px 1fr 350px;
   flex: 1;
   overflow: hidden;
   padding: 1.5rem;
@@ -483,7 +483,7 @@
 /* Responsive */
 @media (max-width: 1200px) {
   .main-layout {
-    grid-template-columns: 200px 1fr 300px;
+    grid-template-columns: 180px 1fr 300px;
   }
 }
 

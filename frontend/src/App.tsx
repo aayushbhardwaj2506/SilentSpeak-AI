@@ -500,7 +500,7 @@ function App() {
       <header className="header">
         <div className="logo-section">
           <h1>SilentSpeak AI</h1>
-          <p>System Active</p>
+          <p>AI Sign Language Interpreter</p>
         </div>
         <div className="status-badge online">
           <span className="dot"></span> Online
@@ -533,9 +533,10 @@ function App() {
           <div className="video-section">
             <div className="video-wrapper">
               {!cameraActive && (
-                <div className="placeholder-content">
+                <div className="placeholder-content" style={{textAlign: 'center'}}>
                   <span className="camera-icon">📷</span>
-                  <p>System Offline</p>
+                  <p style={{margin: '0.5rem 0', fontWeight: 'bold'}}>CAMERA READY</p>
+                  <p style={{fontSize: '0.8rem', color: 'var(--text-muted)'}}>Start interpreter to begin</p>
                 </div>
               )}
               <video 
@@ -597,16 +598,23 @@ function App() {
           
           <div className="panel-block">
             <span className="label">Current Detection</span>
-            <div className="gesture-result">
-              {gestureResult?.gesture === 'NO_HAND' ? 'WAITING...' : 
-               gestureResult?.gesture === 'UNKNOWN' ? 'UNKNOWN' : 
-               (GESTURE_VOCABULARY[gestureResult?.gesture || '']?.displayName || gestureResult?.gesture || 'WAITING...')}
+            <div className="gesture-result" style={{display: 'flex', flexDirection: 'column'}}>
+              <span>
+                {gestureResult?.gesture === 'NO_HAND' ? 'WAITING...' : 
+                 gestureResult?.gesture === 'UNKNOWN' ? 'UNKNOWN' : 
+                 (GESTURE_VOCABULARY[gestureResult?.gesture || '']?.displayName || gestureResult?.gesture || 'WAITING...')}
+              </span>
+              {gestureResult && gestureResult.gesture !== 'NO_HAND' && gestureResult.gesture !== 'UNKNOWN' && (
+                <span style={{fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 'normal'}}>
+                  Confidence {Math.round(gestureResult.confidence * 100)}%
+                </span>
+              )}
             </div>
           </div>
 
           <div className="panel-block">
-            <span className="label">Sequence Interpretation</span>
-            {agentDecision ? (
+            <span className="label">Semantic Interpretation</span>
+            {agentDecision && agentDecision.intent ? (
               <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
                 <div className="sequence-chain">
                   {agentDecision.intent}
@@ -625,7 +633,7 @@ function App() {
                 </div>
               </div>
             ) : (
-              <div style={{color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.85rem'}}>Awaiting context sequence...</div>
+              <div style={{color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.9rem', padding: '1rem', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', textAlign: 'center'}}>Waiting for gesture...</div>
             )}
           </div>
 
@@ -647,12 +655,18 @@ function App() {
       <footer className="footer-controls">
         {!cameraActive ? (
           <button className="btn btn-primary" onClick={startCamera} disabled={!handLandmarker}>
-            ▶ {handLandmarker ? 'Start Interpreter' : 'Initializing AI...'}
+            ▶ START INTERPRETER
           </button>
         ) : (
-          <button className="btn btn-danger" onClick={stopCamera}>
-            ⏹ Stop Interpreter
-          </button>
+          <div style={{display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center'}}>
+            <button className="btn btn-danger" onClick={stopCamera} style={{minWidth: 'auto', padding: '0.75rem 1.5rem'}}>
+              ■ STOP
+            </button>
+            <div style={{display: 'flex', gap: '1rem'}}>
+              <span className="status-badge online" style={{background: 'rgba(239, 68, 68, 0.1)', border: 'none'}}><span className="dot"></span> CAMERA ACTIVE</span>
+              <span className="status-badge online" style={{background: 'rgba(239, 68, 68, 0.1)', border: 'none'}}><span className="dot"></span> AI ACTIVE</span>
+            </div>
+          </div>
         )}
       </footer>
     </div>

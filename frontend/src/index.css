@@ -17,7 +17,7 @@ body {
   margin: 0;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
   background-color: var(--bg-dark);
-  background-image: linear-gradient(to right, rgba(10, 10, 10, 0.95) 0%, rgba(10, 10, 10, 0.7) 100%), url('/cinematic-bg.png');
+  background-image: linear-gradient(to right, rgba(10, 10, 10, 0.98) 0%, rgba(10, 10, 10, 0.8) 100%), url('/cinematic-bg.png');
   background-size: cover;
   background-position: right center;
   background-attachment: fixed;
