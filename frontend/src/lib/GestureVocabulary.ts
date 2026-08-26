@@ -12,20 +12,7 @@ export interface GestureDefinition {
 
 // Registry mapping semantic concepts to vocabulary rules
 export const GESTURE_VOCABULARY: Record<string, GestureDefinition> = {
-  // =========================================================================
-  // 1. NUMBERS (Direct Speech remains for deterministic counting)
-  // =========================================================================
-  NUMBER_0: { token: 'NUMBER_0', category: 'number', displayName: 'Zero', possibleMeanings: ['0', 'zero', 'none'], directSpeech: 'Zero.', requiresContext: false, priority: 'NORMAL' },
-  NUMBER_1: { token: 'NUMBER_1', category: 'number', displayName: 'One', possibleMeanings: ['1', 'one', 'a'], directSpeech: 'One.', requiresContext: false, priority: 'NORMAL' },
-  NUMBER_2: { token: 'NUMBER_2', category: 'number', displayName: 'Two', possibleMeanings: ['2', 'two', 'pair'], directSpeech: 'Two.', requiresContext: false, priority: 'NORMAL' },
-  NUMBER_3: { token: 'NUMBER_3', category: 'number', displayName: 'Three', possibleMeanings: ['3', 'three'], directSpeech: 'Three.', requiresContext: false, priority: 'NORMAL' },
-  NUMBER_4: { token: 'NUMBER_4', category: 'number', displayName: 'Four', possibleMeanings: ['4', 'four'], directSpeech: 'Four.', requiresContext: false, priority: 'NORMAL' },
-  NUMBER_5: { token: 'NUMBER_5', category: 'number', displayName: 'Five', possibleMeanings: ['5', 'five'], directSpeech: 'Five.', requiresContext: false, priority: 'NORMAL' },
-  NUMBER_6: { token: 'NUMBER_6', category: 'number', displayName: 'Six', possibleMeanings: ['6', 'six'], directSpeech: 'Six.', requiresContext: false, priority: 'NORMAL' },
-  NUMBER_7: { token: 'NUMBER_7', category: 'number', displayName: 'Seven', possibleMeanings: ['7', 'seven'], directSpeech: 'Seven.', requiresContext: false, priority: 'NORMAL' },
-  NUMBER_8: { token: 'NUMBER_8', category: 'number', displayName: 'Eight', possibleMeanings: ['8', 'eight'], directSpeech: 'Eight.', requiresContext: false, priority: 'NORMAL' },
-  NUMBER_9: { token: 'NUMBER_9', category: 'number', displayName: 'Nine', possibleMeanings: ['9', 'nine'], directSpeech: 'Nine.', requiresContext: false, priority: 'NORMAL' },
-  NUMBER_10: { token: 'NUMBER_10', category: 'number', displayName: 'Ten', possibleMeanings: ['10', 'ten'], directSpeech: 'Ten.', requiresContext: false, priority: 'NORMAL' },
+
 
   // =========================================================================
   // 2. CORE CONFIRMATION & SOCIAL

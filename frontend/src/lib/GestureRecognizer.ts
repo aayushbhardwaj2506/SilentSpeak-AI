@@ -5,7 +5,6 @@ export interface NormalizedLandmark {
   visibility?: number;
 }
 export type GestureType = 'HELLO' | 'YES' | 'NO' | 'HELP' | 'WATER' | 'STOP' | 'THANK_YOU' | 'UNKNOWN' | 'NO_HAND' | 
-  'NUMBER_0' | 'NUMBER_1' | 'NUMBER_2' | 'NUMBER_3' | 'NUMBER_4' | 'NUMBER_5' | 'NUMBER_6' | 'NUMBER_7' | 'NUMBER_8' | 'NUMBER_9' | 'NUMBER_10' | 
   'THUMBS_UP' | 'THUMBS_DOWN' | 'PEACE' | 'OK_SIGN' | 'FIST' | 'OPEN_PALM' |
   'POINT_UP' | 'POINT_DOWN' | 'POINT_LEFT' | 'POINT_RIGHT' | 
   'PALMS_TOGETHER' | 'PINCH' | 'CALL_ME' | 'INDEX_HOOK' | 'CUPPED_HAND' | 'FLAT_HAND_UP' | 'HAND_ON_CHEST';
@@ -126,33 +125,15 @@ export class GestureRecognizer {
       
     const thumbTip = hand[4];
     const indexTip = hand[8];
-    const middleTip = hand[12];
-    const ringTip = hand[16];
-    const pinkyTip = hand[20];
 
     // PINCH (Thumb and Index touching, others closed)
     if (dist(thumbTip, indexTip) < 0.05 && matchStatic([0, 0, 0, 0, 0]) > 0.6) {
       return { gesture: 'PINCH', confidence: 0.9 };
     }
 
-    // NUMBER_9 / OK_SIGN (Thumb and Index touching, others extended)
+    // OK_SIGN (Thumb and Index touching, others extended)
     if (dist(thumbTip, indexTip) < 0.05 && matchStatic([0, 0, 1, 1, 1]) > 0.7) {
-      return { gesture: 'OK_SIGN', confidence: 0.9 }; // Mapped to NUMBER_9 in context
-    }
-    
-    // NUMBER_8 (Thumb and Middle touching, others extended)
-    if (dist(thumbTip, middleTip) < 0.05 && matchStatic([0, 1, 0, 1, 1]) > 0.7) {
-      return { gesture: 'NUMBER_8', confidence: 0.9 };
-    }
-
-    // NUMBER_7 (Thumb and Ring touching, others extended)
-    if (dist(thumbTip, ringTip) < 0.05 && matchStatic([0, 1, 1, 0, 1]) > 0.7) {
-      return { gesture: 'NUMBER_7', confidence: 0.9 };
-    }
-    
-    // NUMBER_6 (Thumb and Pinky touching, others extended)
-    if (dist(thumbTip, pinkyTip) < 0.05 && matchStatic([0, 1, 1, 1, 0]) > 0.7) {
-      return { gesture: 'NUMBER_6', confidence: 0.9 };
+      return { gesture: 'OK_SIGN', confidence: 0.9 };
     }
 
     // 1. WATER: Index, Middle, Ring extended (no pinky touch)
@@ -172,7 +153,6 @@ export class GestureRecognizer {
     if (fistWithThumbConf > 0.8) {
       const thumbIp = hand[3];
       if (thumbTip.y < thumbIp.y && thumbTip.y < wrist.y - 0.05) {
-        if (Math.abs(movement.totalDistX) > 0.1) return { gesture: 'NUMBER_10', confidence: fistWithThumbConf }; // Shake thumbs up
         if (Math.abs(movement.dy) > 0.1) return { gesture: 'YES', confidence: fistWithThumbConf };
         return { gesture: 'THUMBS_UP', confidence: fistWithThumbConf };
       } else if (thumbTip.y > thumbIp.y && thumbTip.y > wrist.y + 0.05) {
@@ -181,48 +161,44 @@ export class GestureRecognizer {
       }
     }
 
-    // Numbers 0-5
-    const num0Conf = matchStatic([0, 0, 0, 0, 0]); // FIST
-    if (num0Conf > 0.85) {
-      return { gesture: 'NUMBER_0', confidence: num0Conf };
+    // Fist (all closed)
+    const fistConf = matchStatic([0, 0, 0, 0, 0]);
+    if (fistConf > 0.85) {
+      return { gesture: 'FIST', confidence: fistConf };
     }
 
-    const num1Conf = matchStatic([0, 1, 0, 0, 0]); // POINTING
-    if (num1Conf > 0.85) {
+    // Pointing (Index only)
+    const pointConf = matchStatic([0, 1, 0, 0, 0]);
+    if (pointConf > 0.85) {
       const indexPip = hand[6];
       // Check for INDEX_HOOK
       if (dist(indexTip, wrist) < dist(indexPip, wrist)) {
-        return { gesture: 'INDEX_HOOK', confidence: num1Conf };
+        return { gesture: 'INDEX_HOOK', confidence: pointConf };
       }
-      if (indexTip.y < wrist.y - 0.1) return { gesture: 'NUMBER_1', confidence: num1Conf }; // pointing up is 1
-      if (indexTip.y > wrist.y + 0.1) return { gesture: 'POINT_DOWN', confidence: num1Conf };
-      if (indexTip.x < wrist.x - 0.1) return { gesture: 'POINT_RIGHT', confidence: num1Conf }; 
-      if (indexTip.x > wrist.x + 0.1) return { gesture: 'POINT_LEFT', confidence: num1Conf };
-      return { gesture: 'POINT_UP', confidence: num1Conf };
+      if (indexTip.y > wrist.y + 0.1) return { gesture: 'POINT_DOWN', confidence: pointConf };
+      if (indexTip.x < wrist.x - 0.1) return { gesture: 'POINT_RIGHT', confidence: pointConf }; 
+      if (indexTip.x > wrist.x + 0.1) return { gesture: 'POINT_LEFT', confidence: pointConf };
+      return { gesture: 'POINT_UP', confidence: pointConf };
     }
 
-    const num2Conf = matchStatic([0, 1, 1, 0, 0]); // PEACE / 2
-    if (num2Conf > 0.85) return { gesture: 'NUMBER_2', confidence: num2Conf };
+    // Peace (Index and Middle)
+    const peaceConf = matchStatic([0, 1, 1, 0, 0]);
+    if (peaceConf > 0.85) return { gesture: 'PEACE', confidence: peaceConf };
 
-    const num3Conf = matchStatic([1, 1, 1, 0, 0]); // Standard 3
-    if (num3Conf > 0.85) return { gesture: 'NUMBER_3', confidence: num3Conf };
-
-    const num4Conf = matchStatic([0, 1, 1, 1, 1]);
-    if (num4Conf > 0.85) return { gesture: 'NUMBER_4', confidence: num4Conf };
-
-    const num5Conf = matchStatic([1, 1, 1, 1, 1]);
-    if (num5Conf > 0.85) {
+    // Open Palm (All extended)
+    const palmConf = matchStatic([1, 1, 1, 1, 1]);
+    if (palmConf > 0.85) {
       if (movement.totalDistX > 0.15) {
-        return { gesture: 'HELLO', confidence: num5Conf }; // Waving
+        return { gesture: 'HELLO', confidence: palmConf }; // Waving
       } else if (movement.dy > 0.1) {
-        return { gesture: 'THANK_YOU', confidence: num5Conf }; // Moving down
+        return { gesture: 'THANK_YOU', confidence: palmConf }; // Moving down
       } else if (movement.dy < -0.1) {
-        return { gesture: 'FLAT_HAND_UP', confidence: num5Conf }; // Moving up/flat hand
+        return { gesture: 'FLAT_HAND_UP', confidence: palmConf }; // Moving up/flat hand
       } else if (movement.totalDistX < 0.05 && Math.abs(movement.dy) < 0.05) {
-        if (wrist.y > 0.6) return { gesture: 'HAND_ON_CHEST', confidence: num5Conf };
-        return { gesture: 'NUMBER_5', confidence: num5Conf }; 
+        if (wrist.y > 0.6) return { gesture: 'HAND_ON_CHEST', confidence: palmConf };
+        return { gesture: 'OPEN_PALM', confidence: palmConf }; 
       }
-      return { gesture: 'OPEN_PALM', confidence: num5Conf };
+      return { gesture: 'OPEN_PALM', confidence: palmConf };
     }
     
     // CUPPED_HAND (all fingers half bent)

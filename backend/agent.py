@@ -150,17 +150,6 @@ class SilentSpeakAgent:
             
         # Direct Speech Bypass (Phase 4)
         DIRECT_SPEECH_MAP = {
-            "NUMBER_0": ("NUMBER", "Zero."),
-            "NUMBER_1": ("NUMBER", "One."),
-            "NUMBER_2": ("NUMBER", "Two."),
-            "NUMBER_3": ("NUMBER", "Three."),
-            "NUMBER_4": ("NUMBER", "Four."),
-            "NUMBER_5": ("NUMBER", "Five."),
-            "NUMBER_6": ("NUMBER", "Six."),
-            "NUMBER_7": ("NUMBER", "Seven."),
-            "NUMBER_8": ("NUMBER", "Eight."),
-            "NUMBER_9": ("NUMBER", "Nine."),
-            "NUMBER_10": ("NUMBER", "Ten."),
             "STOP": ("STOP_ACTION", "Stop."),
             "HELP": ("EMERGENCY", "I need help.")
         }
