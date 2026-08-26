@@ -23,7 +23,7 @@ interface HistoryItem {
 
 interface HandTrackingData {
   numHands: number;
-  handednesses: string[];
+  hands: { category: string; score: number }[];
   distanceNormalized: number | null;
 }
 
@@ -56,7 +56,7 @@ function App() {
   const [gestureResult, setGestureResult] = useState<GestureResult | null>(null);
   const [agentDecision, setAgentDecision] = useState<AgentDecision | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
-  const [__, setHandTrackingData] = useState<HandTrackingData>({ numHands: 0, handednesses: [], distanceNormalized: null });
+  const [handTrackingData, setHandTrackingData] = useState<HandTrackingData>({ numHands: 0, hands: [], distanceNormalized: null });
   
   const actionObserverRef = useRef(new ActionObserver());
   const [___, setActionPayload] = useState<ActionObservationPayload | null>(null);
@@ -222,9 +222,17 @@ function App() {
       
       // Multi-hand processing
       const numHands = results.landmarks ? results.landmarks.length : 0;
-      const handednesses = results.handednesses ? results.handednesses.map(h => h[0].categoryName) : [];
       let distanceNormalized = null;
       
+      // Update Hand Tracking Stats for UI
+      setHandTrackingData({
+        numHands: numHands,
+        hands: results.handednesses ? results.handednesses.map(h => ({
+          category: h[0].categoryName,
+          score: h[0].score
+        })) : [],
+        distanceNormalized: distanceNormalized
+      });
       // Action Observer process
       const observation = actionObserverRef.current.processFrames(perceptionDataRef.current, startTimeMs);
       if (observation) {
@@ -274,12 +282,6 @@ function App() {
           orbRef.current.style.opacity = '0';
         }
       }
-      
-      setHandTrackingData({
-        numHands,
-        handednesses,
-        distanceNormalized
-      });
 
       const result = recognizerRef.current.processFrames(results.landmarks, startTimeMs);
       
@@ -488,8 +490,8 @@ function App() {
       {/* Header */}
       <header className="header">
         <div className="logo-section">
-          <h1>SilentSpeak</h1>
-          <p>AI Gesture → Speech Communication</p>
+          <h1>SilentSpeak AI</h1>
+          <p>System Active</p>
         </div>
         <div className="status-badge online">
           <span className="dot"></span> Online
@@ -498,52 +500,127 @@ function App() {
 
       {/* Main Layout */}
       <main className="main-layout">
-        {/* Video Section */}
-        <section className="video-section">
-          <div className="video-wrapper">
-            {!cameraActive && (
-              <div className="placeholder-content">
-                <span className="camera-icon">📷</span>
-                <p>Camera is inactive</p>
+        
+        {/* Left Column: Navigation & AI Status */}
+        <aside className="left-col glass-panel">
+          <div className="nav-menu">
+            <div className="nav-item active">🏠 Navigation</div>
+            <div className="nav-item">💬 Interpreter</div>
+            <div className="nav-item">🕒 History</div>
+          </div>
+          
+          <div className="ai-status-panel">
+             <span className="label">AI Engine Status</span>
+             <div>
+               <span className={`agent-badge ${isProcessing ? 'processing' : isSpeaking ? 'speaking' : 'idle'}`}>
+                 {isProcessing ? "THINKING..." : isSpeaking ? "🔊 SPEAKING..." : "IDLE"}
+               </span>
+             </div>
+          </div>
+        </aside>
+
+        {/* Center Column: Camera & Hand Tracking */}
+        <section className="center-col">
+          <div className="video-section">
+            <div className="video-wrapper">
+              {!cameraActive && (
+                <div className="placeholder-content">
+                  <span className="camera-icon">📷</span>
+                  <p>System Offline</p>
+                </div>
+              )}
+              <video 
+                ref={videoRef} 
+                autoPlay 
+                playsInline 
+                muted 
+                className={`camera-feed ${cameraActive ? 'visible' : 'hidden'}`}
+              />
+              <canvas
+                ref={canvasRef}
+                className={`output-canvas ${cameraActive ? 'visible' : 'hidden'}`}
+              />
+              <div ref={orbRef} className="energy-orb">
+                <div className="orb-core"></div>
               </div>
-            )}
-            <video 
-              ref={videoRef} 
-              autoPlay 
-              playsInline 
-              muted 
-              className={`camera-feed ${cameraActive ? 'visible' : 'hidden'}`}
-            />
-            <canvas
-              ref={canvasRef}
-              className={`output-canvas ${cameraActive ? 'visible' : 'hidden'}`}
-            />
+            </div>
+          </div>
+
+          <div className="hand-tracking-panel glass-panel">
+            <div className="hand-stats-header">
+              <span className="label">Hand Tracking & Detection</span>
+              <div style={{textAlign: 'right'}}>
+                <div className="hand-count">{handTrackingData.numHands}</div>
+                <div className="hand-count-label">Hands Detected</div>
+              </div>
+            </div>
             
-            <div ref={orbRef} className="energy-orb">
-              <div className="orb-core"></div>
+            <div className="hands-details">
+              <div className="hand-detail-box">
+                <span className="hand-title">Left Hand</span>
+                {handTrackingData.hands.find(h => h.category === 'Left') ? (
+                   <>
+                     <span className="hand-status active">● Detected</span>
+                     <span className="hand-conf">Confidence {Math.round(handTrackingData.hands.find(h => h.category === 'Left')!.score * 100)}%</span>
+                   </>
+                ) : (
+                   <span className="hand-status inactive">○ Not Found</span>
+                )}
+              </div>
+              
+              <div className="hand-detail-box">
+                <span className="hand-title">Right Hand</span>
+                {handTrackingData.hands.find(h => h.category === 'Right') ? (
+                   <>
+                     <span className="hand-status active">● Detected</span>
+                     <span className="hand-conf">Confidence {Math.round(handTrackingData.hands.find(h => h.category === 'Right')!.score * 100)}%</span>
+                   </>
+                ) : (
+                   <span className="hand-status inactive">○ Not Found</span>
+                )}
+              </div>
             </div>
           </div>
         </section>
 
-        {/* Communication Panel */}
-        <section className="communication-panel">
+        {/* Right Column: Output & Sequence */}
+        <aside className="right-col glass-panel">
+          
           <div className="panel-block">
-            <span className="label">Detected Gesture</span>
+            <span className="label">Current Detection</span>
             <div className="gesture-result">
               {gestureResult?.gesture === 'NO_HAND' ? 'WAITING...' : 
                gestureResult?.gesture === 'UNKNOWN' ? 'UNKNOWN' : 
-               gestureResult?.gesture || 'WAITING...'}
+               (GESTURE_VOCABULARY[gestureResult?.gesture || '']?.displayName || gestureResult?.gesture || 'WAITING...')}
             </div>
           </div>
 
           <div className="panel-block">
-            <span className="label">Speaking</span>
-            <div className="speech-result">
-              {agentDecision ? agentDecision.response_text : "..."}
-            </div>
+            <span className="label">Sequence Interpretation</span>
+            {agentDecision ? (
+              <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
+                <div className="sequence-chain">
+                  {agentDecision.intent}
+                </div>
+                <div className="seq-meaning">
+                  "{agentDecision.response_text}"
+                </div>
+                <div className="confidence-bar-container">
+                   <div className="conf-header">
+                     <span>Confidence</span>
+                     <span>{Math.round((agentDecision.confidence || 0.91) * 100)}%</span>
+                   </div>
+                   <div className="conf-track">
+                     <div className="conf-fill" style={{width: `${Math.round((agentDecision.confidence || 0.91) * 100)}%`}}></div>
+                   </div>
+                </div>
+              </div>
+            ) : (
+              <div style={{color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.85rem'}}>Awaiting context sequence...</div>
+            )}
           </div>
 
-          <div className="panel-block">
+          <div className="panel-block" style={{marginTop: 'auto'}}>
             <span className="label">Recent History</span>
             <div className="history-list">
               {history.length === 0 ? <div className="history-empty">No history yet</div> : history.map(item => (
@@ -555,23 +632,20 @@ function App() {
             </div>
           </div>
 
-          <div className="controls-section">
-            {!cameraActive ? (
-              <button className="btn btn-primary" onClick={startCamera} disabled={!handLandmarker}>
-                ▶ {handLandmarker ? 'Start' : 'Loading Model...'}
-              </button>
-            ) : (
-              <button className="btn btn-danger" onClick={stopCamera}>
-                ⏹ Stop
-              </button>
-            )}
-            
-            <div style={{textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-muted)'}}>
-              {isProcessing ? "Thinking..." : isSpeaking ? "🔊 Speaking..." : "Idle"}
-            </div>
-          </div>
-        </section>
+        </aside>
       </main>
+
+      <footer className="footer-controls">
+        {!cameraActive ? (
+          <button className="btn btn-primary" onClick={startCamera} disabled={!handLandmarker}>
+            ▶ {handLandmarker ? 'Start Interpreter' : 'Initializing AI...'}
+          </button>
+        ) : (
+          <button className="btn btn-danger" onClick={stopCamera}>
+            ⏹ Stop Interpreter
+          </button>
+        )}
+      </footer>
     </div>
   )
 }

@@ -1,13 +1,14 @@
 :root {
-  --bg-dark: #121212;
-  --bg-panel: rgba(24, 24, 27, 0.7);
-  --bg-panel-solid: #18181b;
+  --bg-dark: #0a0a0a;
+  --bg-panel: rgba(15, 15, 15, 0.85);
+  --bg-panel-solid: #121212;
   --text-main: #f8fafc;
   --text-muted: #a1a1aa;
-  --accent: #fbbf24;
-  --accent-hover: #f59e0b;
+  --accent: #ef4444;       /* Glowing Red */
+  --accent-hover: #dc2626; /* Deep Crimson */
+  --accent-glow: rgba(239, 68, 68, 0.3);
   --danger: #ef4444;
-  --danger-hover: #dc2626;
+  --danger-hover: #b91c1c;
   --success: #10b981;
   --warning: #f59e0b;
 }
@@ -16,6 +17,10 @@ body {
   margin: 0;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
   background-color: var(--bg-dark);
+  background-image: linear-gradient(to right, rgba(10, 10, 10, 0.95) 0%, rgba(10, 10, 10, 0.7) 100%), url('/cinematic-bg.png');
+  background-size: cover;
+  background-position: right center;
+  background-attachment: fixed;
   color: var(--text-main);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
