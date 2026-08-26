@@ -132,17 +132,26 @@ function App() {
 
   const startCamera = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      let stream: MediaStream;
+      try {
+        // Try rear camera first
+        stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: { ideal: "environment" } }, 
+          audio: false 
+        });
+      } catch (e) {
+        // Fallback to any camera
+        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      }
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.onloadedmetadata = () => {
-          videoRef.current?.play();
+          videoRef.current?.play().catch(e => console.error("Video play failed:", e));
           setCameraActive(true);
           cameraActiveRef.current = true;
           setError(null);
           
-          // UI updater for Dev Panel was removed
-
           // Start detection loop once video is loaded
           predictWebcam();
         };

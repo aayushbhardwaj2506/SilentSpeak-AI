@@ -498,10 +498,17 @@
     display: flex;
     flex-direction: column;
     padding: 1rem;
+    gap: 1rem;
   }
   
+  .left-col {
+    display: none;
+  }
+
   .video-section {
-    min-height: 40vh;
+    min-height: auto;
+    width: 100%;
+    aspect-ratio: 4/3;
   }
 
   .footer-controls {
