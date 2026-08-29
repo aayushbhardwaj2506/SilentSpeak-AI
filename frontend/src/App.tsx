@@ -49,6 +49,7 @@ function App() {
   const smoothedPosYRef = useRef<number>(50);
   const [cameraActive, setCameraActive] = useState(false);
   const [_, setError] = useState<string | null>(null);
+  const [requiresTap, setRequiresTap] = useState(false);
   const [handLandmarker, setHandLandmarker] = useState<HandLandmarker | null>(null);
   const [faceLandmarker, setFaceLandmarker] = useState<FaceLandmarker | null>(null);
   const [poseLandmarker, setPoseLandmarker] = useState<PoseLandmarker | null>(null);
@@ -132,6 +133,7 @@ function App() {
 
   const startCamera = async () => {
     try {
+      console.log("[CAMERA] getUserMedia requested");
       let stream: MediaStream;
       try {
         // Try front camera first
@@ -141,20 +143,49 @@ function App() {
         });
       } catch (e) {
         // Fallback to any camera
+        console.log("[CAMERA] Fallback to any camera");
         stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
       }
 
+      console.log("[CAMERA] stream obtained:", stream?.id);
+      const videoTrack = stream.getVideoTracks()[0];
+      console.log("[CAMERA] camera track status:", videoTrack ? videoTrack.readyState : 'no track', videoTrack?.label);
+
       if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.onloadedmetadata = () => {
-          videoRef.current?.play().catch(e => console.error("Video play failed:", e));
-          setCameraActive(true);
-          cameraActiveRef.current = true;
-          setError(null);
+        const video = videoRef.current;
+        video.muted = true;
+        video.autoplay = true;
+        video.playsInline = true;
+
+        const handleVideoLoaded = async () => {
+          console.log("[CAMERA] onloadedmetadata fired. Video dimensions:", video.videoWidth, "x", video.videoHeight);
+          console.log("[CAMERA] video.readyState:", video.readyState);
           
-          // Start detection loop once video is loaded
-          predictWebcam();
+          try {
+            await video.play();
+            console.log("[CAMERA] video.play() success");
+            setCameraActive(true);
+            cameraActiveRef.current = true;
+            setError(null);
+            setRequiresTap(false);
+            
+            // Start detection loop once video is loaded
+            predictWebcam();
+          } catch (e) {
+            console.error("[CAMERA] video.play() failed:", e);
+            setRequiresTap(true);
+            setCameraActive(true);
+            cameraActiveRef.current = true;
+            setError("Tap to Start Camera (Autoplay restricted)");
+          }
         };
+
+        video.onloadedmetadata = handleVideoLoaded;
+        video.srcObject = stream;
+
+        if (video.readyState >= 1) {
+          handleVideoLoaded();
+        }
       }
     } catch (err) {
       setError("Could not access camera. Please allow permissions.");
@@ -521,9 +552,9 @@ function App() {
           <div className="ai-status-panel">
              <span className="label">AI Engine Status</span>
              <div>
-               <span className={`agent-badge ${isProcessing ? 'processing' : isSpeaking ? 'speaking' : 'idle'}`}>
-                 {isProcessing ? "THINKING..." : isSpeaking ? "🔊 SPEAKING..." : "IDLE"}
-               </span>
+                <span className={`agent-badge ${isProcessing ? 'processing' : isSpeaking ? 'speaking' : 'idle'}`}>
+                  {isProcessing ? "THINKING..." : isSpeaking ? "🔊 SPEAKING..." : "IDLE"}
+                </span>
              </div>
           </div>
         </aside>
@@ -537,6 +568,37 @@ function App() {
                   <span className="camera-icon">📷</span>
                   <p style={{margin: '0.5rem 0', fontWeight: 'bold'}}>CAMERA READY</p>
                   <p style={{fontSize: '0.8rem', color: 'var(--text-muted)'}}>Start interpreter to begin</p>
+                </div>
+              )}
+              {requiresTap && (
+                <div 
+                  style={{
+                    position: 'absolute',
+                    top: 0, left: 0, right: 0, bottom: 0,
+                    display: 'flex', justifyContent: 'center', alignItems: 'center',
+                    backgroundColor: 'rgba(0,0,0,0.8)',
+                    zIndex: 20,
+                    cursor: 'pointer',
+                    flexDirection: 'column',
+                    gap: '1rem'
+                  }}
+                  onClick={() => {
+                    videoRef.current?.play()
+                      .then(() => {
+                        console.log("[CAMERA] manual video.play() success");
+                        setRequiresTap(false);
+                        setError(null);
+                        predictWebcam();
+                      })
+                      .catch(e => console.error("[CAMERA] manual video.play() still failed:", e));
+                  }}
+                >
+                  <div style={{ padding: '1rem 2rem', background: 'var(--accent)', color: '#000', borderRadius: '8px', fontWeight: 'bold', textTransform: 'uppercase' }}>
+                    TAP TO START CAMERA
+                  </div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                    Browser autoplay restriction enabled
+                  </div>
                 </div>
               )}
               <video 
