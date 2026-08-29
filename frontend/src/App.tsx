@@ -527,6 +527,7 @@ function App() {
 
   return (
     <div className="app-container">
+      <div className="baymax-bg"></div>
       {/* Header */}
       <header className="header">
         <div className="logo-section">
