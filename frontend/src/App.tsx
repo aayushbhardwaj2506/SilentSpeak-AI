@@ -54,13 +54,15 @@ function App() {
   const [faceLandmarker, setFaceLandmarker] = useState<FaceLandmarker | null>(null);
   const [poseLandmarker, setPoseLandmarker] = useState<PoseLandmarker | null>(null);
   
-  const [gestureResult, setGestureResult] = useState<GestureResult | null>(null);
+  const [leftGestureResult, setLeftGestureResult] = useState<GestureResult | null>(null);
+  const [rightGestureResult, setRightGestureResult] = useState<GestureResult | null>(null);
   const [agentDecision, setAgentDecision] = useState<AgentDecision | null>(null);
-  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [combinedHistory, setCombinedHistory] = useState<HistoryItem[]>([]);
   const [handTrackingData, setHandTrackingData] = useState<HandTrackingData>({ numHands: 0, hands: [], distanceNormalized: null });
   
   const actionObserverRef = useRef(new ActionObserver());
   const [___, setActionPayload] = useState<ActionObservationPayload | null>(null);
+  const [liveObservations, setLiveObservations] = useState<{left: string[], right: string[], conclusion: string[]}>({left: [], right: [], conclusion: []});
 
   // Use a ref for real-time perception data to avoid 60fps re-renders
   const perceptionDataRef = useRef<PerceptionData>({
@@ -68,16 +70,19 @@ function App() {
     face: { landmarks: [] },
     pose: { landmarks: [] }
   });
-  // State just for the dev UI (updated periodically or on demand)
-  // const [uiPerceptionState, setUiPerceptionState] = useState<PerceptionData>(perceptionDataRef.current);
   
   const [isProcessing, setIsProcessing] = useState(false);
   const isProcessingRef = useRef<boolean>(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const lastGestureResultRef = useRef<GestureResult | null>(null);
-  const lastInterpretedGestureRef = useRef<string | null>(null);
   
-  const recognizerRef = useRef(new GestureRecognizer());
+  const lastLeftResultRef = useRef<GestureResult | null>(null);
+  const lastRightResultRef = useRef<GestureResult | null>(null);
+  const lastInterpretedLeftRef = useRef<string | null>(null);
+  const lastInterpretedRightRef = useRef<string | null>(null);
+  
+  const leftRecognizerRef = useRef(new GestureRecognizer());
+  const rightRecognizerRef = useRef(new GestureRecognizer());
+  
   const requestRef = useRef<number>(0);
   const cameraActiveRef = useRef<boolean>(false);
   const observationQueueRef = useRef<ActionObservationPayload[]>([]);
@@ -86,6 +91,10 @@ function App() {
 
   // Initialize MediaPipe HandLandmarker
   useEffect(() => {
+    actionObserverRef.current.onObservationsUpdate = (obs) => {
+      setLiveObservations(obs);
+    };
+
     const initializeMediaPipe = async () => {
       try {
         const vision = await FilesetResolver.forVisionTasks(
@@ -323,34 +332,67 @@ function App() {
         }
       }
 
-      const result = recognizerRef.current.processFrames(results.landmarks, startTimeMs);
+      const leftLandmarks: any[][] = [];
+      const rightLandmarks: any[][] = [];
       
-      const lastRes = lastGestureResultRef.current;
-      if (!lastRes || 
-          lastRes.gesture !== result.gesture || 
-          Math.abs(lastRes.confidence - result.confidence) > 0.05 || 
-          lastRes.stable !== result.stable) {
-        setGestureResult(result);
-        lastGestureResultRef.current = result;
+      if (results.landmarks && results.handednesses) {
+        for (let i = 0; i < results.landmarks.length; i++) {
+          const cat = results.handednesses[i][0].categoryName.toLowerCase();
+          if (cat === 'left') leftLandmarks.push(results.landmarks[i]);
+          else rightLandmarks.push(results.landmarks[i]);
+        }
+      }
+      
+      const leftResult = leftRecognizerRef.current.processFrames(leftLandmarks, startTimeMs);
+      const rightResult = rightRecognizerRef.current.processFrames(rightLandmarks, startTimeMs);
+
+      const checkStateChange = (res: GestureResult, lastRef: React.MutableRefObject<GestureResult | null>) => {
+         return !lastRef.current || 
+                lastRef.current.gesture !== res.gesture || 
+                Math.abs(lastRef.current.confidence - res.confidence) > 0.05 || 
+                lastRef.current.stable !== res.stable;
+      };
+
+      if (checkStateChange(leftResult, lastLeftResultRef)) {
+        setLeftGestureResult(leftResult);
+        lastLeftResultRef.current = leftResult;
+      }
+      if (checkStateChange(rightResult, lastRightResultRef)) {
+        setRightGestureResult(rightResult);
+        lastRightResultRef.current = rightResult;
       }
 
-      // If gesture becomes stable, and it's a new gesture, trigger agent
-      if (result.stable && result.gesture !== 'NO_HAND' && result.gesture !== 'UNKNOWN') {
-        if (lastInterpretedGestureRef.current !== result.gesture && !isProcessingRef.current) {
-          lastInterpretedGestureRef.current = result.gesture;
-          actionObserverRef.current.addSemanticObservation(result.gesture, startTimeMs);
-          
-          const def = GESTURE_VOCABULARY[result.gesture];
-          if (def && def.directSpeech) {
-            // Fast-lane for deterministic actions (e.g. HELP, numbers)
-            interpretGesture(result);
+      const checkStable = (res: GestureResult, lastRef: React.MutableRefObject<string | null>, category: 'left'|'right') => {
+        if (res.stable && res.gesture !== 'NO_HAND' && res.gesture !== 'UNKNOWN') {
+          if (lastRef.current !== res.gesture && !isProcessingRef.current) {
+            lastRef.current = res.gesture;
+            actionObserverRef.current.addSemanticObservation(category, res.gesture, startTimeMs);
+            return true;
           }
+        } else if (!res.stable || res.gesture === 'NO_HAND') {
+          if (res.gesture === 'NO_HAND') lastRef.current = null;
         }
-      } else if (!result.stable || result.gesture === 'NO_HAND') {
-        // Reset so same gesture can be interpreted again if hand is removed and brought back
-        if (result.gesture === 'NO_HAND') {
-           lastInterpretedGestureRef.current = null;
-        }
+        return false;
+      };
+
+      const leftTriggered = checkStable(leftResult, lastInterpretedLeftRef, 'left');
+      const rightTriggered = checkStable(rightResult, lastInterpretedRightRef, 'right');
+      
+      if (leftTriggered || rightTriggered) {
+         const lG = lastInterpretedLeftRef.current;
+         const rG = lastInterpretedRightRef.current;
+         let combinedGesture = "";
+         if (lG && rG) combinedGesture = `LEFT: ${lG}, RIGHT: ${rG}`;
+         else if (lG) combinedGesture = `LEFT: ${lG}`;
+         else if (rG) combinedGesture = `RIGHT: ${rG}`;
+         
+         if (combinedGesture && !isProcessingRef.current) {
+            const defL = lG ? GESTURE_VOCABULARY[lG] : null;
+            const defR = rG ? GESTURE_VOCABULARY[rG] : null;
+            if ((defL && defL.directSpeech) || (defR && defR.directSpeech)) {
+               interpretGesture({ gesture: combinedGesture as any, confidence: Math.max(leftResult.confidence, rightResult.confidence), stable: true, timestamp: startTimeMs });
+            }
+         }
       }
 
       canvasCtx.save();
@@ -439,7 +481,7 @@ function App() {
         
         if ((data.decision === "SPEAK" || data.decision === "CONFIRM") && data.response_text) {
           playTTS(data.response_text);
-          setHistory(prev => [{
+          setCombinedHistory(prev => [{
             id: Date.now().toString() + Math.random(),
             gesture: 'SEQUENCE',
             text: data.response_text,
@@ -506,7 +548,7 @@ function App() {
       
       if ((data.decision === 'SPEAK' || data.decision === 'CONFIRM') && data.response_text) {
         playTTS(data.response_text);
-        setHistory(prev => [{
+        setCombinedHistory(prev => [{
           id: Date.now().toString() + Math.random(),
           gesture: result.gesture,
           text: data.response_text,
@@ -598,7 +640,7 @@ function App() {
         </section>
 
         {/* AI Interpreter Panel */}
-        <aside className="interpreter-panel">
+        <aside className="interpreter-panel" style={{ width: '420px', overflowY: 'auto' }}>
           
           {/* Avatar Section */}
           <div className="avatar-section">
@@ -614,25 +656,54 @@ function App() {
             </div>
           </div>
 
-          {/* Semantic Sequence Interpretation */}
-          <div className="interpretation-section">
-            <div className="section-label">Semantic Flow</div>
-            <div style={{ fontSize: '0.7rem', color: 'var(--accent)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '1px' }}>
-              Live: {gestureResult?.gesture && gestureResult.gesture !== 'NO_HAND' && gestureResult.gesture !== 'UNKNOWN' ? (GESTURE_VOCABULARY[gestureResult.gesture]?.displayName || gestureResult.gesture) : 'Observing...'}
+          <div style={{ display: 'flex', gap: '0.5rem', width: '100%', marginBottom: '1rem' }}>
+            {/* Left Arm Panel */}
+            <div style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: '8px', padding: '0.5rem' }}>
+              <div className="section-label" style={{textAlign: 'center', marginBottom: '0.5rem'}}>Left Arm</div>
+              <div style={{ fontSize: '0.65rem', color: 'var(--accent)', marginBottom: '0.5rem', textAlign: 'center', minHeight: '15px' }}>
+                Flow: {leftGestureResult?.gesture && leftGestureResult.gesture !== 'NO_HAND' && leftGestureResult.gesture !== 'UNKNOWN' ? (GESTURE_VOCABULARY[leftGestureResult.gesture]?.displayName || leftGestureResult.gesture) : '...'}
+              </div>
+              <div className="live-observations" style={{ height: '120px', overflowY: 'auto' }}>
+                {liveObservations.left.length > 0 ? liveObservations.left.map((obs, idx) => (
+                  <div key={idx} style={{ fontSize: '0.65rem', color: '#e2e8f0', borderLeft: '2px solid var(--accent)', paddingLeft: '4px', marginBottom: '2px', lineHeight: '1.2' }}>&gt; {obs}</div>
+                )) : <div style={{color: 'var(--text-muted)', fontSize: '0.65rem', fontStyle: 'italic', textAlign: 'center', marginTop: '1rem'}}>Waiting...</div>}
+              </div>
             </div>
+            
+            {/* Right Arm Panel */}
+            <div style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: '8px', padding: '0.5rem' }}>
+              <div className="section-label" style={{textAlign: 'center', marginBottom: '0.5rem'}}>Right Arm</div>
+              <div style={{ fontSize: '0.65rem', color: 'var(--accent)', marginBottom: '0.5rem', textAlign: 'center', minHeight: '15px' }}>
+                Flow: {rightGestureResult?.gesture && rightGestureResult.gesture !== 'NO_HAND' && rightGestureResult.gesture !== 'UNKNOWN' ? (GESTURE_VOCABULARY[rightGestureResult.gesture]?.displayName || rightGestureResult.gesture) : '...'}
+              </div>
+              <div className="live-observations" style={{ height: '120px', overflowY: 'auto' }}>
+                {liveObservations.right.length > 0 ? liveObservations.right.map((obs, idx) => (
+                  <div key={idx} style={{ fontSize: '0.65rem', color: '#e2e8f0', borderLeft: '2px solid var(--accent)', paddingLeft: '4px', marginBottom: '2px', lineHeight: '1.2' }}>&gt; {obs}</div>
+                )) : <div style={{color: 'var(--text-muted)', fontSize: '0.65rem', fontStyle: 'italic', textAlign: 'center', marginTop: '1rem'}}>Waiting...</div>}
+              </div>
+            </div>
+          </div>
+
+          {/* AI Conclusion & Understanding */}
+          <div className="interpretation-section" style={{marginBottom: '1rem'}}>
+            <div className="section-label">Combined AI Conclusion</div>
+            <div className="live-observations" style={{ maxHeight: '100px', overflowY: 'auto', marginBottom: '0.75rem' }}>
+               {liveObservations.conclusion.length > 0 ? liveObservations.conclusion.map((obs, idx) => (
+                  <div key={idx} style={{ fontSize: '0.7rem', color: '#10b981', borderLeft: '2px solid #10b981', paddingLeft: '6px', marginBottom: '4px', lineHeight: '1.3' }}>&gt; {obs}</div>
+               )) : <div style={{color: 'var(--text-muted)', fontSize: '0.7rem', fontStyle: 'italic'}}>No sequence formed yet...</div>}
+            </div>
+
             {agentDecision && agentDecision.intent ? (
               <>
-                <div className="semantic-flow">
-                  {agentDecision.intent.split(' ').map((word, i) => (
-                    <span key={i} className="flow-gesture">{word.replace(/_/g, ' ')}</span>
-                  ))}
+                <div className="semantic-flow" style={{ fontSize: '0.75rem' }}>
+                  <span className="flow-gesture">{agentDecision.intent}</span>
                   <span className="flow-arrow">→</span>
-                  <span>AI UNDERSTANDING</span>
+                  <span>UNDERSTANDING</span>
                 </div>
-                <div className="final-speech">
-                  {agentDecision.response_text}
+                <div className="final-speech" style={{ fontSize: '0.9rem', marginTop: '0.5rem' }}>
+                  "{agentDecision.response_text}"
                 </div>
-                <div className="confidence-display">
+                <div className="confidence-display" style={{ marginTop: '0.5rem' }}>
                   <span>Confidence {Math.round((agentDecision.confidence || 0.91) * 100)}%</span>
                   <div className="conf-bar-bg">
                     <div className="conf-bar-fill" style={{width: `${Math.round((agentDecision.confidence || 0.91) * 100)}%`}}></div>
@@ -640,7 +711,7 @@ function App() {
                 </div>
               </>
             ) : (
-              <div style={{color: 'var(--text-muted)', fontSize: '0.8rem', fontStyle: 'italic'}}>Waiting for gestures...</div>
+              <div style={{color: 'var(--text-muted)', fontSize: '0.75rem', fontStyle: 'italic', textAlign: 'center'}}>Waiting for combined gestures...</div>
             )}
           </div>
 
@@ -648,12 +719,12 @@ function App() {
           <div className="history-section">
              <div className="section-label">Recent Conversation</div>
              <div className="history-list">
-               {history.length === 0 ? (
+               {combinedHistory.length === 0 ? (
                  <div style={{color: 'var(--text-muted)', fontSize: '0.8rem', fontStyle: 'italic'}}>No history yet</div>
-               ) : history.map(item => (
+               ) : combinedHistory.map(item => (
                  <div key={item.id} className="history-bubble">
                    <div style={{fontSize: '0.65rem', color: 'var(--accent)', marginBottom: '0.3rem', letterSpacing: '1px'}}>
-                     {item.gesture === 'SEQUENCE' ? 'SEQUENCE' : (GESTURE_VOCABULARY[item.gesture]?.displayName || item.gesture)}
+                     {item.gesture === 'SEQUENCE' ? 'SEQUENCE' : item.gesture}
                    </div>
                    {item.text}
                  </div>

@@ -20,6 +20,7 @@ class AgentDecision(BaseModel):
     intent: str = Field(description="The semantic intent of the gesture (e.g. REQUEST_HELP)")
     decision: Literal["SPEAK", "IGNORE", "CONFIRM"] = Field(description="Must be exactly one of: SPEAK, IGNORE, CONFIRM")
     response_text: str = Field(description="The natural language response or text to be spoken/displayed")
+    reasoning: str = Field(description="The logical reasoning process explaining how the observations translate to the response", default="")
     confidence: float = Field(description="The confidence level in this interpretation (0.0 to 1.0)")
 
 class SilentSpeakAgent:
